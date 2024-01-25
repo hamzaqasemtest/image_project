@@ -9,7 +9,9 @@ from fastapi import FastAPI, UploadFile, File , Form
 import uvicorn
 import asyncio
 import textwrap
-
+import openai
+import json
+import os
 
 app = FastAPI()
 
@@ -48,6 +50,25 @@ def analyze_image(image_contents, custom_prompt):
     except Exception as e:
         print("Error: ", e)
 
+
+def getNewImage(prompt):
+
+    client = openai.AzureOpenAI(
+        api_version= os.getenv("api_version"),
+        azure_endpoint= os.getenv("azure_endpoint"),
+        api_key= os.getenv("api_key"),
+    )
+
+    result = client.images.generate(
+        model="dalle_images_lookup",
+        prompt=prompt,
+        n=1
+    )
+
+
+    return json.loads(result.model_dump_json())['data'][0]['url']
+
+
 @app.post("/analyzeImage")
 async def analyze_uploaded_image(uploaded_image: UploadFile = File(...), prompt: str = Form(...)):
     try:
@@ -56,7 +77,10 @@ async def analyze_uploaded_image(uploaded_image: UploadFile = File(...), prompt:
         image_contents = await uploaded_image.read()
 
         result = analyze_image(image_contents, prompt)  # Remove 'await'
-        return result
+
+        image_url = getNewImage(result)
+
+        return {"image_decribtion": result, "image_url": image_url}
     except Exception as e:
         return {"error": str(e)}
 
